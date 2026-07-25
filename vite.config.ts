@@ -14,10 +14,35 @@ export default defineConfig({
   },
   nitro: {
     preset: "vercel",
+    externals: {
+      inline: [
+        "@floating-ui/react-dom",
+        "@floating-ui/core",
+        "@floating-ui/utils",
+        "@radix-ui/react-popover",
+        "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-tooltip",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-select",
+        "@radix-ui/react-context-menu",
+        "@radix-ui/react-hover-card",
+        "@radix-ui/react-menubar",
+        "@radix-ui/react-accordion",
+        "@radix-ui/react-avatar",
+        "@radix-ui/react-tabs",
+      ],
+    },
   },
   vite: {
     ssr: {
-      noExternal: ["@floating-ui/react-dom", "lucide-react", "motion"],
+      noExternal: [
+        "@floating-ui/react-dom",
+        "@floating-ui/core",
+        "@floating-ui/utils",
+        "@radix-ui/*",
+        "lucide-react",
+        "motion",
+      ],
     },
   },
 });
