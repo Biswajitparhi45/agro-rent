@@ -1,10 +1,12 @@
 import dns from "dns";
 import mongoose from "mongoose";
 
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1"]);
-} catch {
-  // Ignore in environments where setting DNS servers is prohibited
+if (process.env.NODE_ENV === "development" && !process.env.VERCEL) {
+  try {
+    dns.setServers(["8.8.8.8", "1.1.1.1"]);
+  } catch {
+    // Ignore in environments where setting DNS servers is prohibited
+  }
 }
 
 const MONGODB_URI =

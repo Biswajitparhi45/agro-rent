@@ -17,7 +17,7 @@ export default defineConfig({
   },
   vite: {
     ssr: {
-      noExternal: ["@floating-ui/react-dom"],
+      noExternal: ["@floating-ui/react-dom", "lucide-react", "motion"],
     },
   },
 });
