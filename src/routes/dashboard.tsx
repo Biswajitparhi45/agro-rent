@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useMotionValue, animate } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -33,6 +33,8 @@ import {
   Sliders,
   Bell,
   Building,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -82,6 +84,8 @@ function Dashboard() {
   const [section, setSection] = useState("Dashboard");
   const [ownerEquipment, setOwnerEquipment] = useState<Equipment[]>(initialEquipment);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Messages state
   const [activeChat, setActiveChat] = useState("Gurpreet Singh");
@@ -130,9 +134,17 @@ function Dashboard() {
     const category = String(form.get("category") ?? "Tractor");
     const price = Number(form.get("price") ?? 2500);
     const location = String(form.get("location") ?? "Ludhiana, Punjab");
+    const chassisNo = String(form.get("chassisNo") ?? "").trim();
+    const power = String(form.get("power") ?? "50 HP").trim();
+    const fuel = String(form.get("fuel") ?? "Diesel").trim();
+    const year = Number(form.get("year") ?? new Date().getFullYear());
 
     if (!name) {
       toast.error("Please enter equipment name.");
+      return;
+    }
+    if (!chassisNo) {
+      toast.error("Please enter chassis number.");
       return;
     }
 
@@ -147,17 +159,34 @@ function Dashboard() {
       available: true,
       owner: userName,
       ownerSince: "2026",
-      power: "50 HP",
-      fuel: "Diesel",
+      power: power || "50 HP",
+      fuel: fuel || "Diesel",
       width: "2.1 m",
-      year: 2025,
-      summary: "High efficiency machinery listed for seasonal farm operations.",
-      image: "https://images.unsplash.com/photo-1592982537447-6f2a6a0c7c18?auto=format&fit=crop&q=80&w=800",
+      year,
+      summary: `Chassis: ${chassisNo} · High efficiency machinery listed for seasonal farm operations.`,
+      image: imagePreview ||
+        "https://images.unsplash.com/photo-1592982537447-6f2a6a0c7c18?auto=format&fit=crop&q=80&w=800",
     };
 
     setOwnerEquipment((prev) => [newItem, ...prev]);
     setShowAddModal(false);
+    setImagePreview(null);
     toast.success(`${name} listed successfully on AgriRent!`);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be smaller than 10 MB.");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
   };
 
   const toggleEquipmentAvailability = (id: string) => {
@@ -588,45 +617,142 @@ function Dashboard() {
       {/* Add Equipment Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div onClick={() => setShowAddModal(false)} className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
+          <div onClick={() => { setShowAddModal(false); setImagePreview(null); }} className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative glass w-full max-w-md rounded-3xl p-6 shadow-float border border-border/80 bg-card"
+            className="relative glass w-full max-w-lg rounded-3xl shadow-float border border-border/80 bg-card overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="font-bold text-base">List New Machinery</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-muted-foreground hover:text-foreground text-xs cursor-pointer">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
+              <div>
+                <h3 className="font-bold text-base">List New Machinery</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Fill all details to publish your equipment listing</p>
+              </div>
+              <button
+                onClick={() => { setShowAddModal(false); setImagePreview(null); }}
+                className="grid h-7 w-7 place-items-center rounded-full bg-muted hover:bg-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-sm"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddEquipment} className="mt-4 space-y-3">
-              <div>
-                <Label className="text-xs">Machine Name</Label>
-                <Input name="name" placeholder="John Deere 5310 55HP" className="mt-1 h-9 text-xs rounded-xl" required />
-              </div>
+            {/* Scrollable Form Body */}
+            <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
+              <form id="add-equipment-form" onSubmit={handleAddEquipment} className="space-y-4">
 
-              <div className="grid grid-cols-2 gap-3">
+                {/* Image Upload */}
                 <div>
-                  <Label className="text-xs">Category</Label>
-                  <Input name="category" defaultValue="Tractor" className="mt-1 h-9 text-xs rounded-xl" required />
+                  <Label className="text-xs font-semibold">Equipment Photo</Label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-1.5 relative flex flex-col items-center justify-center w-full h-36 rounded-2xl border-2 border-dashed border-border/70 bg-muted/40 hover:bg-muted/70 cursor-pointer transition-colors overflow-hidden group"
+                  >
+                    {imagePreview ? (
+                      <>
+                        <img src={imagePreview} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                          <Upload className="h-5 w-5 text-white" />
+                          <span className="text-[10px] text-white font-semibold">Change Photo</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                        <p className="text-xs font-medium">Click to upload image</p>
+                        <p className="text-[10px]">PNG, JPG, WEBP · Max 10 MB</p>
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                  </div>
                 </div>
+
+                {/* Machine Name */}
                 <div>
-                  <Label className="text-xs">Price / Day (₹)</Label>
-                  <Input name="price" type="number" defaultValue="2800" className="mt-1 h-9 text-xs rounded-xl" required />
+                  <Label className="text-xs font-semibold">Machine Name <span className="text-destructive">*</span></Label>
+                  <Input name="name" placeholder="e.g. John Deere 5310 55HP" className="mt-1.5 h-9 text-xs rounded-xl" required />
                 </div>
-              </div>
 
-              <div>
-                <Label className="text-xs">Location / District</Label>
-                <Input name="location" defaultValue="Amritsar, Punjab" className="mt-1 h-9 text-xs rounded-xl" required />
-              </div>
+                {/* Chassis Number */}
+                <div>
+                  <Label className="text-xs font-semibold">Chassis / Frame Number <span className="text-destructive">*</span></Label>
+                  <Input
+                    name="chassisNo"
+                    placeholder="e.g. MHCJD5310P0012345"
+                    className="mt-1.5 h-9 text-xs rounded-xl font-mono tracking-wide"
+                    required
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Enter the chassis/frame number exactly as on the RC/registration document.</p>
+                </div>
 
-              <Button type="submit" variant="hero" className="w-full h-10 rounded-xl font-bold mt-2">
+                {/* Category & Price */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Category <span className="text-destructive">*</span></Label>
+                    <Input name="category" defaultValue="Tractor" className="mt-1.5 h-9 text-xs rounded-xl" required />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Price / Day (₹) <span className="text-destructive">*</span></Label>
+                    <Input name="price" type="number" defaultValue="2800" min="100" className="mt-1.5 h-9 text-xs rounded-xl" required />
+                  </div>
+                </div>
+
+                {/* Power & Fuel */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Engine Power</Label>
+                    <Input name="power" placeholder="e.g. 55 HP" defaultValue="50 HP" className="mt-1.5 h-9 text-xs rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Fuel Type</Label>
+                    <Input name="fuel" placeholder="Diesel / Petrol / Electric" defaultValue="Diesel" className="mt-1.5 h-9 text-xs rounded-xl" />
+                  </div>
+                </div>
+
+                {/* Year & Location */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Mfg. Year <span className="text-destructive">*</span></Label>
+                    <Input name="year" type="number" defaultValue={new Date().getFullYear()} min="1990" max={new Date().getFullYear()} className="mt-1.5 h-9 text-xs rounded-xl" required />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Location / District <span className="text-destructive">*</span></Label>
+                    <Input name="location" defaultValue="Amritsar, Punjab" className="mt-1.5 h-9 text-xs rounded-xl" required />
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="border-t border-border/60 px-6 py-4 flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1 rounded-xl"
+                onClick={() => { setShowAddModal(false); setImagePreview(null); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="add-equipment-form"
+                variant="hero"
+                className="flex-[2] h-10 rounded-xl font-bold gap-2"
+              >
+                <Upload className="h-4 w-4" />
                 Publish Listing
               </Button>
-            </form>
+            </div>
           </motion.div>
         </div>
       )}
