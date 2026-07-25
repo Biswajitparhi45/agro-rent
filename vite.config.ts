@@ -16,6 +16,10 @@ export default defineConfig({
     preset: "vercel",
     externals: {
       inline: [
+        "@tanstack/react-query",
+        "@tanstack/react-router",
+        "@tanstack/react-start",
+        "@tanstack/router-plugin",
         "@floating-ui/react-dom",
         "@floating-ui/core",
         "@floating-ui/utils",
@@ -36,6 +40,10 @@ export default defineConfig({
   vite: {
     ssr: {
       noExternal: [
+        "@tanstack/react-query",
+        "@tanstack/react-router",
+        "@tanstack/react-start",
+        "@tanstack/router-plugin",
         "@floating-ui/react-dom",
         "@floating-ui/core",
         "@floating-ui/utils",
