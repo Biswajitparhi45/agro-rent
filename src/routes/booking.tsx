@@ -58,6 +58,13 @@ function BookingFlow() {
   const [days, setDays] = useState(isNaN(parsedDays) || parsedDays < 1 ? 3 : parsedDays);
   const [paying, setPaying] = useState(false);
 
+  const [location, setLocation] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvc, setCvc] = useState("");
+  const [cardName, setCardName] = useState(user?.name || "");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+
   const item = getEquipment(selected)!;
   const subtotal = item ? item.price * days : 0;
   const fees = Math.round(subtotal * 0.05);
@@ -66,6 +73,22 @@ function BookingFlow() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const pay = () => {
+    const errs: Record<string, boolean> = {};
+    if (!location.trim()) errs.location = true;
+    if (!cardNumber.trim()) errs.cardNumber = true;
+    if (!expiry.trim()) errs.expiry = true;
+    if (!cvc.trim()) errs.cvc = true;
+    if (!cardName.trim()) errs.cardName = true;
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      toast.error("Please fill in all required fields before proceeding.", {
+        description: "Delivery address and payment details are mandatory.",
+      });
+      return;
+    }
+    setFieldErrors({});
+
     setPaying(true);
     const today = new Date();
     const format = (d: Date) => d.toISOString().split("T")[0];
@@ -77,7 +100,7 @@ function BookingFlow() {
         id: `bk_${Date.now()}`,
         equipmentId: item.id,
         equipmentName: item.name,
-        renterName: user?.name || "Rajesh Kumar",
+        renterName: user?.name || cardName.trim() || "Rajesh Kumar",
         renterEmail: user?.email || "farmer@agrirent.in",
         fromDate: fromStr,
         toDate: toStr,
@@ -175,26 +198,66 @@ function BookingFlow() {
                   <div className="surface-card space-y-4 p-6">
                     <h2 className="font-display text-lg font-bold">Payment & Delivery Details</h2>
                     <div>
-                      <Label htmlFor="site">Field / Delivery Location</Label>
-                      <Input id="site" placeholder="Plot no., Village or Tehsil address" className="mt-2" />
+                      <Label htmlFor="site">Field / Delivery Location <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="site"
+                        value={location}
+                        onChange={(e) => { setLocation(e.target.value); setFieldErrors((p) => ({ ...p, location: false })); }}
+                        placeholder="Plot no., Village or Tehsil address"
+                        className={cn("mt-2", fieldErrors.location && "border-destructive ring-2 ring-destructive/20")}
+                        required
+                      />
+                      {fieldErrors.location && <p className="text-[11px] font-semibold text-destructive mt-1">Delivery location is required.</p>}
                     </div>
                     <div className="pt-2 border-t border-border/60">
-                      <Label htmlFor="card">Card number</Label>
-                      <Input id="card" placeholder="4242 4242 4242 4242" className="mt-2" />
+                      <Label htmlFor="card">Card number <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="card"
+                        value={cardNumber}
+                        onChange={(e) => { setCardNumber(e.target.value); setFieldErrors((p) => ({ ...p, cardNumber: false })); }}
+                        placeholder="4242 4242 4242 4242"
+                        className={cn("mt-2", fieldErrors.cardNumber && "border-destructive ring-2 ring-destructive/20")}
+                        required
+                      />
+                      {fieldErrors.cardNumber && <p className="text-[11px] font-semibold text-destructive mt-1">Card number is required.</p>}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="exp">Expiry</Label>
-                        <Input id="exp" placeholder="09/29" className="mt-2" />
+                        <Label htmlFor="exp">Expiry <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="exp"
+                          value={expiry}
+                          onChange={(e) => { setExpiry(e.target.value); setFieldErrors((p) => ({ ...p, expiry: false })); }}
+                          placeholder="09/29"
+                          className={cn("mt-2", fieldErrors.expiry && "border-destructive ring-2 ring-destructive/20")}
+                          required
+                        />
+                        {fieldErrors.expiry && <p className="text-[11px] font-semibold text-destructive mt-1">Expiry date is required.</p>}
                       </div>
                       <div>
-                        <Label htmlFor="cvc">CVC</Label>
-                        <Input id="cvc" placeholder="123" className="mt-2" />
+                        <Label htmlFor="cvc">CVC <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="cvc"
+                          value={cvc}
+                          onChange={(e) => { setCvc(e.target.value); setFieldErrors((p) => ({ ...p, cvc: false })); }}
+                          placeholder="123"
+                          className={cn("mt-2", fieldErrors.cvc && "border-destructive ring-2 ring-destructive/20")}
+                          required
+                        />
+                        {fieldErrors.cvc && <p className="text-[11px] font-semibold text-destructive mt-1">CVC is required.</p>}
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="name">Name on card</Label>
-                      <Input id="name" placeholder="Full name" className="mt-2" />
+                      <Label htmlFor="name">Name on card <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="name"
+                        value={cardName}
+                        onChange={(e) => { setCardName(e.target.value); setFieldErrors((p) => ({ ...p, cardName: false })); }}
+                        placeholder="Full name"
+                        className={cn("mt-2", fieldErrors.cardName && "border-destructive ring-2 ring-destructive/20")}
+                        required
+                      />
+                      {fieldErrors.cardName && <p className="text-[11px] font-semibold text-destructive mt-1">Name on card is required.</p>}
                     </div>
                   </div>
                   <Summary item={item} days={days} subtotal={subtotal} fees={fees} from={search.from} to={search.to} />
