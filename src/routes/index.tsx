@@ -20,7 +20,7 @@ import {
   EquipmentCardSkeleton,
 } from "@/components/equipment/equipment-card";
 import { Button } from "@/components/ui/button";
-import { equipment } from "@/lib/equipment-data";
+import { getAllEquipment, type Equipment } from "@/lib/equipment-data";
 import { useAuth } from "@/lib/auth/context";
 
 export const Route = createFileRoute("/")({
@@ -45,10 +45,18 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>(() => getAllEquipment());
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(t);
+    const sync = () => setAllEquipment(getAllEquipment());
+    window.addEventListener("agrirent_equipment_updated", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("agrirent_equipment_updated", sync);
+      window.removeEventListener("storage", sync);
+    };
   }, []);
 
   return (
@@ -109,7 +117,7 @@ function Landing() {
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => <EquipmentCardSkeleton key={i} />)
-            : equipment.map((item, i) => (
+            : allEquipment.filter((e) => e.available).slice(0, 6).map((item, i) => (
                 <EquipmentCard key={item.id} item={item} index={i} />
               ))}
         </div>

@@ -4,6 +4,7 @@ import { Heart, MapPin, Star, Zap, ShieldCheck, UserCheck, Check, Layers } from 
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import fallbackImage from "@/assets/eq-tractor.jpg";
 import { inr, type Equipment } from "@/lib/equipment-data";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
@@ -45,9 +46,13 @@ export function EquipmentCard({
       {/* Top Image Section */}
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
         <img
-          src={item.image}
+          src={item.image || fallbackImage}
           alt={item.name}
           loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = fallbackImage;
+          }}
           className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
         />
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />

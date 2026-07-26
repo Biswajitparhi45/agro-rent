@@ -29,6 +29,37 @@ export const Route = createFileRoute("/auth")({
 
 type Mode = "login" | "register" | "forgot";
 
+const REGISTERED_USERS_KEY = "agrirent_registered_users_v1";
+
+interface LocalUserAccount {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  userId: string;
+}
+
+function getRegisteredLocalUsers(): LocalUserAccount[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(REGISTERED_USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRegisteredLocalUser(acc: LocalUserAccount) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getRegisteredLocalUsers();
+    const updated = [...current.filter((u) => u.email.toLowerCase() !== acc.email.toLowerCase()), acc];
+    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error("Error saving local registered user:", e);
+  }
+}
+
 function Auth() {
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -48,7 +79,7 @@ function Auth() {
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "").trim();
 
@@ -62,6 +93,32 @@ function Auth() {
     try {
       setLoading(true);
       if (mode === "login") {
+        // 1. Check client-side registered users first
+        const localUsers = getRegisteredLocalUsers();
+        const localMatch = localUsers.find((u) => u.email.toLowerCase() === email);
+        if (localMatch) {
+          if (localMatch.password !== password) {
+            setPasswordError("password");
+            toast.error("Incorrect password", { description: "The password you entered is wrong. Please try again." });
+            setLoading(false);
+            return;
+          }
+          const userPayload = {
+            userId: localMatch.userId,
+            name: localMatch.name,
+            email: localMatch.email,
+            role: localMatch.role,
+          };
+          setUser(userPayload);
+          toast.success(`Welcome back, ${userPayload.name}!`);
+          if (userPayload.role === "admin") navigate({ to: "/admin" });
+          else if (userPayload.role === "owner") navigate({ to: "/dashboard" });
+          else navigate({ to: "/" });
+          setLoading(false);
+          return;
+        }
+
+        // 2. Server/DB Login call
         const res = await loginServerFn({ data: { email, password } });
         if (res.success && res.user) {
           setUser(res.user); await refreshUser();
@@ -74,6 +131,13 @@ function Auth() {
         if (!name) { toast.error("Please enter your full name."); setLoading(false); return; }
         const res = await registerServerFn({ data: { name, email, password, role } });
         if (res.success && res.user) {
+          saveRegisteredLocalUser({
+            name: res.user.name,
+            email: res.user.email.toLowerCase(),
+            password,
+            role: res.user.role,
+            userId: res.user.userId,
+          });
           setUser(res.user); await refreshUser();
           toast.success("Account created! Welcome to AgriRent.");
           if (role === "owner") navigate({ to: "/dashboard" }); else navigate({ to: "/" });

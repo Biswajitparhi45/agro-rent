@@ -9,12 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
-import { equipment, getEquipment, inr } from "@/lib/equipment-data";
+import { equipment, getEquipment, inr, saveBookingRecord } from "@/lib/equipment-data";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 
 export const Route = createFileRoute("/booking")({
-  validateSearch: z.object({ equipment: z.string().optional() }),
+  validateSearch: z.object({
+    equipment: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    days: z.union([z.number(), z.string()]).optional(),
+  }),
   head: () => ({
     meta: [
       { title: "Book Equipment in 4 Steps | AgriRent" },
@@ -33,7 +38,7 @@ export const Route = createFileRoute("/booking")({
   component: BookingFlow,
 });
 
-const steps = ["Select Equipment", "Choose Dates", "Payment", "Confirmation"];
+const steps = ["Select Equipment", "Payment & Details", "Confirmation"];
 
 function BookingFlow() {
   const { user, loading } = useAuth();
@@ -47,23 +52,44 @@ function BookingFlow() {
     }
   }, [user, loading, navigate]);
 
+  const parsedDays = search.days ? Number(search.days) : 3;
   const [step, setStep] = useState(search.equipment ? 1 : 0);
   const [selected, setSelected] = useState(search.equipment ?? equipment[0].id);
-  const [days, setDays] = useState(3);
+  const [days, setDays] = useState(isNaN(parsedDays) || parsedDays < 1 ? 3 : parsedDays);
   const [paying, setPaying] = useState(false);
 
   const item = getEquipment(selected)!;
-  const subtotal = item.price * days;
+  const subtotal = item ? item.price * days : 0;
   const fees = Math.round(subtotal * 0.05);
 
-  const next = () => setStep((s) => Math.min(s + 1, 3));
+  const next = () => setStep((s) => Math.min(s + 1, 2));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const pay = () => {
     setPaying(true);
+    const today = new Date();
+    const format = (d: Date) => d.toISOString().split("T")[0];
+    const fromStr = search.from || format(new Date(today.getTime() + 86400000));
+    const toStr = search.to || format(new Date(today.getTime() + 86400000 * (days + 1)));
+
+    if (item) {
+      saveBookingRecord({
+        id: `bk_${Date.now()}`,
+        equipmentId: item.id,
+        equipmentName: item.name,
+        renterName: user?.name || "Rajesh Kumar",
+        renterEmail: user?.email || "farmer@agrirent.in",
+        fromDate: fromStr,
+        toDate: toStr,
+        status: "confirmed",
+        totalPaid: subtotal + fees + 350,
+        timestamp: Date.now(),
+      });
+    }
+
     setTimeout(() => {
       setPaying(false);
-      setStep(3);
+      setStep(2);
     }, 1400);
   };
 
@@ -76,11 +102,11 @@ function BookingFlow() {
           <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
             <motion.div
               className="gradient-primary absolute inset-y-0 left-0 rounded-full"
-              animate={{ width: `${((step + 1) / 4) * 100}%` }}
+              animate={{ width: `${((step + 1) / 3) * 100}%` }}
               transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             />
           </div>
-          <ol className="mt-4 grid grid-cols-4 gap-2">
+          <ol className="mt-4 grid grid-cols-3 gap-2">
             {steps.map((s, i) => (
               <li key={s} className="min-w-0 text-center">
                 <span
@@ -145,51 +171,14 @@ function BookingFlow() {
               )}
 
               {step === 1 && (
-                <div className="grid gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
-                  <div className="surface-card p-3">
-                    <Calendar mode="single" selected={new Date()} className="pointer-events-auto" />
-                  </div>
-                  <div className="surface-card space-y-5 p-6">
-                    <div>
-                      <Label className="text-xs tracking-wide text-muted-foreground uppercase">
-                        Rental length
-                      </Label>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {[1, 2, 3, 5, 7, 14].map((d) => (
-                          <button
-                            key={d}
-                            onClick={() => setDays(d)}
-                            className={cn(
-                              "press rounded-xl border border-border px-4 py-2 text-sm font-semibold transition-colors",
-                              days === d
-                                ? "gradient-primary border-transparent text-primary-foreground"
-                                : "hover:bg-accent",
-                            )}
-                          >
-                            {d} {d === 1 ? "day" : "days"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="pickup">Pickup time</Label>
-                        <Input id="pickup" type="time" defaultValue="07:00" className="mt-2" />
-                      </div>
-                      <div>
-                        <Label htmlFor="site">Field location</Label>
-                        <Input id="site" placeholder="Plot no. / village" className="mt-2" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {step === 2 && (
                 <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                   <div className="surface-card space-y-4 p-6">
-                    <h2 className="font-display text-lg font-bold">Payment details</h2>
+                    <h2 className="font-display text-lg font-bold">Payment & Delivery Details</h2>
                     <div>
+                      <Label htmlFor="site">Field / Delivery Location</Label>
+                      <Input id="site" placeholder="Plot no., Village or Tehsil address" className="mt-2" />
+                    </div>
+                    <div className="pt-2 border-t border-border/60">
                       <Label htmlFor="card">Card number</Label>
                       <Input id="card" placeholder="4242 4242 4242 4242" className="mt-2" />
                     </div>
@@ -208,21 +197,21 @@ function BookingFlow() {
                       <Input id="name" placeholder="Full name" className="mt-2" />
                     </div>
                   </div>
-                  <Summary item={item} days={days} subtotal={subtotal} fees={fees} />
+                  <Summary item={item} days={days} subtotal={subtotal} fees={fees} from={search.from} to={search.to} />
                 </div>
               )}
 
-              {step === 3 && <Confirmation item={item} days={days} total={subtotal + fees} />}
+              {step === 2 && <Confirmation item={item} days={days} total={subtotal + fees} />}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {step < 3 && (
+        {step < 2 && (
           <div className="mt-10 flex items-center justify-between gap-3">
             <Button variant="ghost" onClick={back} disabled={step === 0}>
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            {step === 2 ? (
+            {step === 1 ? (
               <motion.div layout>
                 <Button variant="hero" size="lg" onClick={pay} disabled={paying}>
                   {paying ? (
@@ -231,7 +220,7 @@ function BookingFlow() {
                     </>
                   ) : (
                     <>
-                      <CreditCard className="h-4 w-4" /> Pay {inr(subtotal + fees)}
+                      <CreditCard className="h-4 w-4" /> Pay {inr(subtotal + fees + 350)}
                     </>
                   )}
                 </Button>
@@ -253,29 +242,41 @@ function Summary({
   days,
   subtotal,
   fees,
+  from,
+  to,
 }: {
   item: ReturnType<typeof getEquipment>;
   days: number;
   subtotal: number;
   fees: number;
+  from?: string;
+  to?: string;
 }) {
   if (!item) return null;
   return (
-    <div className="surface-card h-fit p-6">
+    <div className="surface-card h-fit p-6 space-y-3">
       <img
         src={item.image}
         alt={item.name}
         loading="lazy"
         className="h-32 w-full rounded-2xl object-cover"
       />
-      <p className="mt-4 font-semibold">{item.name}</p>
-      <p className="text-xs text-muted-foreground">{item.location}</p>
-      <dl className="mt-5 space-y-2.5 border-t border-border pt-4 text-sm">
-        <Row label={`${inr(item.price)} × ${days} days`} value={inr(subtotal)} />
-        <Row label="Service fee" value={inr(fees)} />
+      <div>
+        <p className="font-semibold">{item.name}</p>
+        <p className="text-xs text-muted-foreground">{item.location}</p>
+      </div>
+      {from && to ? (
+        <div className="rounded-xl bg-muted/60 p-2.5 text-xs text-muted-foreground">
+          <span className="block font-bold text-foreground">Selected Rental Period:</span>
+          <span>📅 {from} → {to} ({days} {days === 1 ? "day" : "days"})</span>
+        </div>
+      ) : null}
+      <dl className="space-y-2.5 border-t border-border pt-3 text-sm">
+        <Row label={`${inr(item.price)} × ${days} ${days === 1 ? "day" : "days"}`} value={inr(subtotal)} />
+        <Row label="Service & Insurance fee" value={inr(fees + 350)} />
         <div className="flex justify-between border-t border-border pt-3 text-base font-bold">
-          <span>Total</span>
-          <span className="text-primary">{inr(subtotal + fees)}</span>
+          <span>Total Payable</span>
+          <span className="text-primary">{inr(subtotal + fees + 350)}</span>
         </div>
       </dl>
     </div>

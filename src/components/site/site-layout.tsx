@@ -8,22 +8,19 @@ import { Sparkles } from "lucide-react";
 export function SiteLayout({
   children,
   bare = false,
+  noFooter = false,
 }: {
   children: ReactNode;
   bare?: boolean;
+  noFooter?: boolean;
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      <motion.main
-        initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className={bare ? "flex-1" : "flex-1 pt-18"}
-      >
+      <main className={bare ? "flex-1" : "flex-1 pt-18"}>
         {children}
-      </motion.main>
-      <Footer />
+      </main>
+      {!noFooter && <Footer />}
     </div>
   );
 }
