@@ -39,12 +39,17 @@ export const registerServerFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const email = data.email.trim().toLowerCase();
 
+    // Check demo/seed accounts first — before any DB call
+    if (DEMO_ACCOUNTS[email]) {
+      throw new Error("Email already registered. Please try a different email or sign in.");
+    }
+
     try {
       await connectDB();
       const existingUser = await UserModel.findOne({ email });
 
       if (existingUser) {
-        throw new Error("User with this email already exists.");
+        throw new Error("Email already registered. Please try a different email or sign in.");
       }
 
       const salt = await bcrypt.genSalt(10);
@@ -69,8 +74,23 @@ export const registerServerFn = createServerFn({ method: "POST" })
 
       return { success: true, user: tokenPayload };
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes("User with this email")) {
-        throw err;
+      // Re-throw any application-level error (e.g. duplicate email).
+      // Only fall back to in-memory session for genuine DB connection failures.
+      if (err instanceof Error) {
+        const msg = err.message.toLowerCase();
+        const isConnectionError =
+          msg.includes("econnrefused") ||
+          msg.includes("querysrv") ||
+          msg.includes("getaddrinfo") ||
+          msg.includes("enotfound") ||
+          msg.includes("mongonetworkerror") ||
+          msg.includes("bad auth") ||
+          msg.includes("authentication failed") ||
+          msg.includes("connect") ||
+          msg.includes("timeout");
+        if (!isConnectionError) {
+          throw err;
+        }
       }
       // Fallback session creation if database connection is restricted
       const tokenPayload: UserSessionPayload = {
@@ -93,7 +113,28 @@ export const loginServerFn = createServerFn({ method: "POST" })
       await connectDB();
       const user = await UserModel.findOne({ email }).select("+password");
 
-      if (user && user.password) {
+      if (!user) {
+        // Check demo accounts before throwing email-not-found
+        const demo = DEMO_ACCOUNTS[email];
+        if (demo) {
+          if (demo.pass !== data.password) {
+            throw new Error("__WRONG_PASSWORD__");
+          }
+          return {
+            success: true,
+            user: {
+              userId: `demo_${demo.role}_101`,
+              name: demo.name,
+              email,
+              role: demo.role,
+              phone: "+91 9876543210",
+            } as UserSessionPayload,
+          };
+        }
+        throw new Error("__EMAIL_NOT_FOUND__");
+      }
+
+      if (user.password) {
         const isMatch = await bcrypt.compare(data.password, user.password);
         if (isMatch) {
           const tokenPayload: UserSessionPayload = {
@@ -106,14 +147,21 @@ export const loginServerFn = createServerFn({ method: "POST" })
           };
           return { success: true, user: tokenPayload };
         }
+        throw new Error("__WRONG_PASSWORD__");
       }
-    } catch {
+    } catch (err: unknown) {
+      if (err instanceof Error && (err.message === "__EMAIL_NOT_FOUND__" || err.message === "__WRONG_PASSWORD__")) {
+        throw err;
+      }
       // Fallback auth check when database connection is restricted or pending
     }
 
-    // Check demo accounts fallback
+    // Check demo accounts fallback (when DB is unavailable)
     const demo = DEMO_ACCOUNTS[email];
-    if (demo && demo.pass === data.password) {
+    if (demo) {
+      if (demo.pass !== data.password) {
+        throw new Error("__WRONG_PASSWORD__");
+      }
       const tokenPayload: UserSessionPayload = {
         userId: `demo_${demo.role}_101`,
         name: demo.name,
@@ -124,7 +172,7 @@ export const loginServerFn = createServerFn({ method: "POST" })
       return { success: true, user: tokenPayload };
     }
 
-    throw new Error("Invalid email or password.");
+    throw new Error("__EMAIL_NOT_FOUND__");
   });
 
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { Heart, MapPin, Star } from "lucide-react";
+import { Heart, MapPin, Star, Zap, ShieldCheck, UserCheck, Check, Layers } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,17 @@ import { inr, type Equipment } from "@/lib/equipment-data";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 
-export function EquipmentCard({ item, index = 0 }: { item: Equipment; index?: number }) {
+export function EquipmentCard({
+  item,
+  index = 0,
+  isCompared = false,
+  onToggleCompare,
+}: {
+  item: Equipment;
+  index?: number;
+  isCompared?: boolean;
+  onToggleCompare?: (item: Equipment) => void;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [fav, setFav] = useState(false);
@@ -20,93 +30,146 @@ export function EquipmentCard({ item, index = 0 }: { item: Equipment; index?: nu
     }
   };
 
+  // Mock distance & hourly price for marketplace richness
+  const distanceKm = Math.floor(4 + (index * 7) % 24);
+  const hourlyRate = Math.round(item.price / 7);
+
   return (
     <motion.article
-      initial={{ opacity: 0, y: 28, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.7, delay: Math.min(index * 0.08, 0.5), ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -8 }}
-      className="group surface-card relative overflow-hidden transition-shadow duration-500 hover:shadow-float"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.6, delay: Math.min(index * 0.06, 0.4), ease: [0.22, 1, 0.36, 1] }}
+      className="group surface-card relative flex flex-col justify-between overflow-hidden rounded-3xl border border-border/80 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-float"
     >
-      <div className="relative aspect-[4/3] overflow-hidden">
+      {/* Top Image Section */}
+      <div className="relative aspect-[16/10] overflow-hidden bg-muted">
         <img
           src={item.image}
           alt={item.name}
           loading="lazy"
-          width={1024}
-          height={768}
-          className="h-full w-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-108"
+          className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
         />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-foreground/45 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
-        <span
-          className={cn(
-            "glass absolute top-3 left-3 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide uppercase",
-            item.available ? "text-primary" : "text-destructive",
-          )}
-        >
-          {item.available ? "Available now" : "Booked"}
-        </span>
-
-        <motion.button
-          aria-label="Save to favourites"
-          onClick={() => {
-            if (!user) {
-              toast.error("Please sign in to save favourites.");
-              navigate({ to: "/auth", search: { mode: "login" } });
-              return;
-            }
-            setFav((f) => !f);
-            toast.success(fav ? "Removed from favourites" : "Saved to favourites");
-          }}
-          whileTap={{ scale: 0.85 }}
-          animate={fav ? { scale: [1, 1.35, 0.92, 1.1, 1] } : {}}
-          transition={{ duration: 0.5 }}
-          className="glass absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full cursor-pointer"
-        >
-          <Heart
+        {/* Status Pills Top Left */}
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
+          <span
             className={cn(
-              "h-4 w-4 transition-colors",
-              fav ? "fill-destructive text-destructive" : "text-foreground",
+              "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide backdrop-blur-md shadow-sm border",
+              item.available
+                ? "bg-emerald-500/90 text-white border-emerald-400/30"
+                : "bg-black/70 text-white/80 border-white/20",
             )}
-          />
-        </motion.button>
+          >
+            {item.available ? "⚡ Instant Book" : "Booked"}
+          </span>
 
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-primary-foreground">
-          <Star className="h-3.5 w-3.5 fill-harvest text-harvest" />
-          <span className="text-xs font-semibold">{item.rating}</span>
-          <span className="text-xs opacity-80">({item.reviews})</span>
+          <span className="bg-black/40 backdrop-blur-md text-white border border-white/20 px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3 text-emerald-400" /> Insured
+          </span>
+        </div>
+
+        {/* Top Right Controls (Favorite + Compare) */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+          {onToggleCompare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCompare(item);
+              }}
+              title="Compare specs"
+              className={cn(
+                "h-8 px-2 rounded-full text-[10px] font-bold flex items-center gap-1 backdrop-blur-md transition-all cursor-pointer border",
+                isCompared
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-black/50 text-white border-white/20 hover:bg-black/70",
+              )}
+            >
+              <Layers className="h-3 w-3" />
+              {isCompared ? "Compared" : "Compare"}
+            </button>
+          )}
+
+          <motion.button
+            aria-label="Save to favourites"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!user) {
+                toast.error("Please sign in to save favourites.");
+                navigate({ to: "/auth", search: { mode: "login" } });
+                return;
+              }
+              setFav((f) => !f);
+              toast.success(fav ? "Removed from wishlist" : "Saved to wishlist");
+            }}
+            whileTap={{ scale: 0.85 }}
+            animate={fav ? { scale: [1, 1.3, 1] } : {}}
+            className="h-8 w-8 grid place-items-center rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-white cursor-pointer hover:bg-black/70 transition-colors"
+          >
+            <Heart
+              className={cn(
+                "h-3.5 w-3.5 transition-colors",
+                fav ? "fill-red-500 text-red-500" : "text-white",
+              )}
+            />
+          </motion.button>
+        </div>
+
+        {/* Rating Overlay Bottom Left */}
+        <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5 text-white z-10">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <span className="text-xs font-bold">{item.rating}</span>
+          <span className="text-[11px] text-white/70">({item.reviews} reviews)</span>
+        </div>
+
+        {/* Distance Badge Bottom Right */}
+        <div className="absolute bottom-2.5 right-3 text-[10px] font-bold text-white/90 bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-md">
+          📍 {distanceKm} km away
         </div>
       </div>
 
-      <div className="space-y-3 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="font-display truncate text-base font-bold">{item.name}</h3>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{item.location}</span>
-            </p>
+      {/* Details Body */}
+      <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-display font-bold text-base leading-snug text-foreground group-hover:text-primary transition-colors">
+              {item.name}
+            </h3>
           </div>
-          <div className="shrink-0 text-right">
-            <p className="font-display text-lg font-extrabold text-primary transition-[text-shadow] duration-500 group-hover:[text-shadow:0_0_18px_color-mix(in_oklab,var(--color-primary)_55%,transparent)]">
-              {inr(item.price)}
-            </p>
-            <p className="text-[11px] text-muted-foreground">per day</p>
+
+          <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="truncate">{item.location}</span>
+          </p>
+
+          {/* Quick Specs Chips */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="bg-muted px-2 py-0.5 rounded-md text-[10px] font-semibold text-muted-foreground">
+              ⚡ {item.power}
+            </span>
+            <span className="bg-muted px-2 py-0.5 rounded-md text-[10px] font-semibold text-muted-foreground">
+              ⛽ {item.fuel}
+            </span>
+            <span className="bg-muted px-2 py-0.5 rounded-md text-[10px] font-semibold text-muted-foreground">
+              📅 {item.year} Model
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 border-t border-border pt-3">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-bold text-accent-foreground">
-            {item.owner.charAt(0)}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {item.owner}
-          </span>
-          <Button asChild size="sm" variant="soft" className="hover:gradient-primary hover:text-primary-foreground">
+        {/* Footer Pricing & CTA */}
+        <div className="pt-3 border-t border-border/60 flex items-center justify-between">
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="font-display text-lg font-extrabold text-primary">{inr(item.price)}</span>
+              <span className="text-[10px] text-muted-foreground font-medium">/ day</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-mono">or ₹{hourlyRate}/hr</p>
+          </div>
+
+          <Button asChild size="sm" variant="hero" className="rounded-xl px-4 text-xs font-bold shadow-glow">
             <Link to="/equipment/$id" params={{ id: item.id }} onClick={handleBookClick}>
-              Book now
+              Rent Now
             </Link>
           </Button>
         </div>
@@ -117,12 +180,12 @@ export function EquipmentCard({ item, index = 0 }: { item: Equipment; index?: nu
 
 export function EquipmentCardSkeleton() {
   return (
-    <div className="surface-card overflow-hidden">
-      <div className="shimmer aspect-[4/3] bg-muted" />
-      <div className="space-y-3 p-5">
+    <div className="surface-card rounded-3xl overflow-hidden border border-border/80 p-4 space-y-3">
+      <div className="shimmer aspect-[16/10] rounded-2xl bg-muted" />
+      <div className="space-y-2">
         <div className="shimmer h-4 w-3/4 rounded-full bg-muted" />
         <div className="shimmer h-3 w-1/2 rounded-full bg-muted" />
-        <div className="shimmer h-9 w-full rounded-xl bg-muted" />
+        <div className="shimmer h-10 w-full rounded-xl bg-muted mt-4" />
       </div>
     </div>
   );
