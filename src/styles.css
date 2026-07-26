@@ -333,16 +333,12 @@
   }
 }
 
-/* Hide Lovable / dev badges */
-#lovable-badge,
-.lovable-badge,
-[id*="lovable-badge"],
-[class*="lovable-badge"],
-#gptengineer-badge,
-.gptengineer-badge,
-lovable-badge {
+/* Hide third-party dev badges */
+[id*="badge"],
+[class*="badge"] {
   display: none !important;
   visibility: hidden !important;
+}
   opacity: 0 !important;
   pointer-events: none !important;
 }
