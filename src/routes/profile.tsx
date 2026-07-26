@@ -1,21 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MapPin, Star, CalendarCheck, Heart, ShieldCheck, User, Settings,
   CheckCircle2, Clock, FileText, Phone, MessageSquare, AlertCircle,
-  Download, LogOut, Tractor, ChevronRight, Filter, Search
+  Download, LogOut, Tractor, ChevronRight, Filter, Search, Send, CheckCheck,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/site-layout";
 import { Button } from "@/components/ui/button";
 import { EquipmentCard } from "@/components/equipment/equipment-card";
-import { equipment, inr } from "@/lib/equipment-data";
+import { equipment, inr, getOwnerMessages, addReplyToMessage, type OwnerMessage } from "@/lib/equipment-data";
 import { useAuth } from "@/lib/auth/context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+import { z } from "zod";
+
 export const Route = createFileRoute("/profile")({
+  validateSearch: z.object({ tab: z.enum(["history", "saved", "messages"]).optional() }),
   head: () => ({
     meta: [
       { title: "Farmer Portal — My Bookings & Rentals | AgriRent" },
@@ -101,14 +104,50 @@ const mockFarmerBookings = [
 function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"history" | "saved">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "saved" | "messages">(search.tab ?? "history");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
   const [selectedInvoice, setSelectedInvoice] = useState<typeof mockFarmerBookings[0] | null>(null);
+
+  const [messages, setMessages] = useState<OwnerMessage[]>([]);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [farmerReplyText, setFarmerReplyText] = useState("");
 
   const userName = user?.name || "Rajesh Kumar";
   const userEmail = user?.email || "farmer@agrirent.in";
   const userRole = user?.role ? user.role.toUpperCase() : "FARMER";
+
+  useEffect(() => {
+    if (search.tab) {
+      setActiveTab(search.tab);
+    }
+  }, [search.tab]);
+
+  useEffect(() => {
+    const sync = () => {
+      const allMsgs = getOwnerMessages();
+      setMessages(allMsgs);
+      if (allMsgs.length > 0) {
+        setActiveMessageId((prev) => prev || allMsgs[0].id);
+      }
+    };
+    sync();
+    window.addEventListener("agrirent_messages_updated", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("agrirent_messages_updated", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const handleSendFarmerReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeMessageId || !farmerReplyText.trim()) return;
+    addReplyToMessage(activeMessageId, farmerReplyText.trim(), userName);
+    toast.success("Reply sent to equipment owner!");
+    setFarmerReplyText("");
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -236,6 +275,23 @@ function Profile() {
             </button>
 
             <button
+              onClick={() => setActiveTab("messages")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border ${
+                activeTab === "messages"
+                  ? "border-primary bg-primary text-primary-foreground shadow-glow"
+                  : "border-border/80 bg-card/80 text-foreground hover:bg-accent"
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>Messages & Inquiries</span>
+              {messages.length > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold shadow-sm">
+                  {messages.length}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab("saved")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border ${
                 activeTab === "saved"
@@ -343,6 +399,132 @@ function Profile() {
                   </div>
                 </motion.div>
               ))
+            )}
+          </div>
+        ) : activeTab === "messages" ? (
+          /* ── TAB: MESSAGES & INQUIRIES ── */
+          <div className="surface-card rounded-3xl border border-border/80 p-6 min-h-[460px] flex flex-col md:flex-row gap-6 shadow-soft">
+            {messages.length === 0 ? (
+              <div className="w-full flex flex-col items-center justify-center p-12 text-center space-y-3">
+                <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto" />
+                <h3 className="text-base font-bold font-display">No Message Inquiries Yet</h3>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  When you send inquiries to equipment owners from the machinery detail pages, owner responses will appear here!
+                </p>
+                <Button asChild variant="hero" size="sm" className="rounded-xl font-bold mt-2">
+                  <Link to="/equipment">Browse Equipment & Message Owners</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Left Conversation List */}
+                <div className="w-full md:w-80 shrink-0 space-y-3 border-r border-border/60 pr-0 md:pr-4">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-3">Your Conversations ({messages.length})</h3>
+                  <div className="space-y-2">
+                    {messages.map((m) => {
+                      const active = m.id === activeMessageId;
+                      const hasReplies = (m.replies?.length ?? 0) > 0;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setActiveMessageId(m.id)}
+                          className={`w-full p-3.5 rounded-2xl text-left transition-all cursor-pointer border ${
+                            active
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border/60 bg-card hover:bg-muted/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-xs font-extrabold font-display truncate text-foreground">{m.equipmentName}</span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">{m.time}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">Owner: {m.ownerName}</p>
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                              hasReplies
+                                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                                : "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                            }`}>
+                              {hasReplies ? "✓ Owner Replied" : "⏳ Awaiting Owner"}
+                            </span>
+                            {hasReplies && <span className="text-[10px] font-bold text-primary">{m.replies!.length} replies</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right Chat Thread */}
+                {(() => {
+                  const activeMsg = messages.find((m) => m.id === activeMessageId) || messages[0];
+                  if (!activeMsg) return null;
+                  const allReplies = activeMsg.replies || [];
+
+                  return (
+                    <div className="flex-1 flex flex-col justify-between min-h-[380px]">
+                      {/* Thread Header */}
+                      <div className="pb-4 border-b border-border/60 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">Owner Conversation</span>
+                          <h3 className="text-base font-extrabold font-display text-foreground">{activeMsg.equipmentName}</h3>
+                          <p className="text-xs text-muted-foreground">Owner: <span className="font-bold text-foreground">{activeMsg.ownerName}</span></p>
+                        </div>
+                        <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold h-8 px-3">
+                          <Link to="/equipment/$id" params={{ id: activeMsg.equipmentId }}>
+                            View Machinery
+                          </Link>
+                        </Button>
+                      </div>
+
+                      {/* Chat Messages Log */}
+                      <div className="flex-1 py-4 space-y-3.5 overflow-y-auto max-h-[320px] pr-2">
+                        {/* Initial Farmer Message */}
+                        <div className="flex flex-col items-end">
+                          <div className="max-w-md bg-primary text-primary-foreground p-3.5 rounded-2xl rounded-tr-xs text-xs shadow-sm space-y-1">
+                            <p className="text-[10px] font-bold opacity-80">You ({userName}) · {activeMsg.time}</p>
+                            <p className="font-medium leading-relaxed">{activeMsg.message}</p>
+                          </div>
+                        </div>
+
+                        {/* Owner & Followup Replies */}
+                        {allReplies.map((r, idx) => {
+                          const isMe = r.sender === userName;
+                          return (
+                            <div key={idx} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                              <div
+                                className={`max-w-md p-3.5 rounded-2xl text-xs shadow-sm space-y-1 ${
+                                  isMe
+                                    ? "bg-primary text-primary-foreground rounded-tr-xs"
+                                    : "bg-muted border border-border/80 text-foreground rounded-tl-xs"
+                                }`}
+                              >
+                                <p className={`text-[10px] font-bold ${isMe ? "opacity-80" : "text-primary"}`}>
+                                  {r.sender} · {r.time}
+                                </p>
+                                <p className="font-medium leading-relaxed">{r.text}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Reply Input Form */}
+                      <form onSubmit={handleSendFarmerReply} className="pt-3 border-t border-border/60 flex items-center gap-2">
+                        <Input
+                          value={farmerReplyText}
+                          onChange={(e) => setFarmerReplyText(e.target.value)}
+                          placeholder={`Reply to ${activeMsg.ownerName}...`}
+                          className="h-10 text-xs rounded-xl flex-1"
+                        />
+                        <Button type="submit" variant="hero" size="sm" className="rounded-xl font-bold h-10 px-4 cursor-pointer gap-1.5 shadow-glow">
+                          <Send className="h-3.5 w-3.5" /> Reply
+                        </Button>
+                      </form>
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         ) : (

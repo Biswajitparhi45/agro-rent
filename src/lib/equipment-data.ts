@@ -201,53 +201,15 @@ export interface OwnerMessage {
   replies?: Array<{ sender: string; text: string; time: string }>;
 }
 
-const MESSAGES_KEY = "agrirent_owner_messages_v1";
+const MESSAGES_KEY = "agrirent_owner_messages_v2";
 
 export function getOwnerMessages(): OwnerMessage[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(MESSAGES_KEY);
     if (!raw) {
-      const initialMsgs: OwnerMessage[] = [
-        {
-          id: "m_1",
-          farmerName: "Gurpreet Singh",
-          farmerRole: "Farmer",
-          equipmentId: "combine-harvester-1",
-          equipmentName: "Combine Harvester XL",
-          ownerName: "Harpreet Singh",
-          message: "Hello! Is the Combine Harvester XL available for harvest next Monday?",
-          time: "10:30 AM",
-          timestamp: Date.now() - 3600000 * 2,
-          replies: [
-            { sender: "Harpreet Singh", text: "Yes Gurpreet, it's fully serviced and ready for pickup.", time: "10:32 AM" },
-          ],
-        },
-        {
-          id: "m_2",
-          farmerName: "Ravi Kumar",
-          farmerRole: "Farmer",
-          equipmentId: "compact-tractor-45hp",
-          equipmentName: "Compact Utility Tractor 45HP",
-          ownerName: "Harpreet Singh",
-          message: "Can you confirm delivery location in Amritsar for 3 days rental?",
-          time: "09:15 AM",
-          timestamp: Date.now() - 3600000 * 5,
-        },
-        {
-          id: "m_3",
-          farmerName: "Vikas Sharma",
-          farmerRole: "Farmer",
-          equipmentId: "rotavator-7ft",
-          equipmentName: "Heavy Duty Rotavator 7ft",
-          ownerName: "Harpreet Singh",
-          message: "Thanks for approving the tractor rental. See you on Friday morning!",
-          time: "Yesterday",
-          timestamp: Date.now() - 86400000,
-        },
-      ];
-      localStorage.setItem(MESSAGES_KEY, JSON.stringify(initialMsgs));
-      return initialMsgs;
+      localStorage.setItem(MESSAGES_KEY, JSON.stringify([]));
+      return [];
     }
     return JSON.parse(raw);
   } catch {

@@ -119,9 +119,16 @@ export function Navbar() {
                 )}
 
                 {user.role === "farmer" && (
-                  <Button asChild variant="soft" size="sm" className="press">
-                    <Link to="/profile">My Profile</Link>
-                  </Button>
+                  <>
+                    <Button asChild variant="hero" size="sm" className="press rounded-xl text-xs font-bold gap-1 shadow-glow">
+                      <Link to="/profile" search={{ tab: "messages" }}>
+                        💬 My Messages
+                      </Link>
+                    </Button>
+                    <Button asChild variant="soft" size="sm" className="press rounded-xl">
+                      <Link to="/profile">My Profile</Link>
+                    </Button>
+                  </>
                 )}
 
                 <Button

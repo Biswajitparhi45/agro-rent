@@ -445,9 +445,10 @@ function EquipmentDetails() {
                     time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                     timestamp: Date.now(),
                   });
-                  toast.success(`Message sent to ${item.owner}! They usually reply within 1 hour.`);
+                  toast.success(`Message sent to ${item.owner}! Opening your conversation thread...`);
                   setMessageModalOpen(false);
                   setMessageText("");
+                  navigate({ to: "/profile", search: { tab: "messages" } });
                 }}
                 className="rounded-xl font-bold h-11 px-6 gap-2 shadow-glow cursor-pointer"
               >
